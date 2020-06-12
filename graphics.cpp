@@ -1,3 +1,4 @@
+#include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #define GLM_FORCE_RADIANS
@@ -183,6 +184,29 @@ bool Render (double const& t, Graphics& graphics)
 	return true;
 }
 
+double STFT (double const* input_signal,
+		int const n_samples,
+		int const chunk_size,
+		int const offset,
+		double const freq)
+{
+	double real_prt = 0;
+	double img_prt = 0;
+	for(int m = 0; m < chunk_size; m++)
+	{
+		real_prt += input_signal[offset + m] * cos(2 * M_PI * m * freq / n_samples);
+		img_prt += input_signal[offset + m] * sin(2 * M_PI * m * freq / n_samples);
+	}
+
+
+	#ifdef DEBUG
+	std::cout << "Real part: " << real_prt << std::endl;
+	std::cout << "Imaginary part: " << img_prt << std::endl;
+	#endif
+
+	return (real_prt * real_prt + img_prt * img_prt) / (n_samples * n_samples);
+}
+
 int main ()
 {   
 	Graphics graphics;
@@ -227,17 +251,21 @@ int main ()
 	glfwSetWindowUserPointer(graphics.window, &graphics);
 
 	//Generate texture
+	double sine_wave[10024];
+	for(int i = 0; i < 10024; i++)
+		sine_wave[i] = sin(2 * M_PI * double(i) / 10024.0);
+
     glGenTextures(1, &graphics.texture);
 	graphics.tex_w = 400;
 	graphics.tex_h = 400; 
 	graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
+    float max_frequency = 2;
+    int window_size = 32;
     for(size_t i = 0; i < graphics.tex_w; ++i)
     {
         for(size_t j = 0; j < graphics.tex_h; ++j)
         {
-            float x = 2 * i / (float)graphics.tex_w - 1;
-            float y = 2 * j / (float)graphics.tex_h - 1;
-            graphics.tex_data[i * graphics.tex_h + j] = fabs(y - sin(10*x));
+            graphics.tex_data[i * graphics.tex_h + j] = STFT(sine_wave, window_size, window_size, i * window_size / 2, j * max_frequency);
         }
     }
 
@@ -249,7 +277,7 @@ int main ()
 
     // Init matrix uniforms 
 	glm::mat4x4 pMat = glm::perspective(glm::radians(45.0f),(GLfloat)graphics.width/graphics.height, 0.1f, 100.0f); 
-    glm::mat4x4 vMat = glm::lookAt(glm::vec3(0.0, 10.0, -5.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); 
+    glm::mat4x4 vMat = glm::lookAt(glm::vec3(0.0, 3.0, 0.1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); 
     glUniformMatrix4fv(graphics.p_mat_loc, 1, GL_FALSE, glm::value_ptr(pMat));
     glUniformMatrix4fv(graphics.v_mat_loc, 1, GL_FALSE, glm::value_ptr(vMat));
 
