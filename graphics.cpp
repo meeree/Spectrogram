@@ -6,6 +6,7 @@
 #include <glm/ext.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "adam_stark_audio_file.h"
 
 #include <algorithm>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <iostream>
 #include <stack>
 #include <random>
+#include <fstream>
 
 struct Graphics 
 {
@@ -184,7 +186,7 @@ bool Render (double const& t, Graphics& graphics)
 	return true;
 }
 
-double STFT (double const* input_signal,
+double STFT (std::vector<double> const& input_signal,
 		int const n_samples,
 		int const chunk_size,
 		int const offset,
@@ -204,7 +206,40 @@ double STFT (double const* input_signal,
 	std::cout << "Imaginary part: " << img_prt << std::endl;
 	#endif
 
-	return (real_prt * real_prt + img_prt * img_prt) / (n_samples * n_samples);
+	return (real_prt * real_prt + img_prt * img_prt);
+}
+
+void GenerateTexture (Graphics& graphics) 
+{
+    // Load in WAV file
+    AudioFile<double> audio_file;
+    audio_file.load("./voice.wav");
+    int channel = 0;
+    int num_samples = audio_file.getNumSamplesPerChannel();
+    auto& data = audio_file.samples[channel];
+
+    int const sample_rate = audio_file.getSampleRate();
+    int const window_size = sample_rate / 10;
+    int const window_shift = window_size / 2;
+    int const max_freq = 16000;
+
+    audio_file.printSummary();
+
+    // Time axis:
+    // We use the whole file by calculating so that we have the exact amount of texels necessary. 
+    // We want (tex_w-1) * window_shift + window_size = N.
+	graphics.tex_w = (data.size() - window_size) / window_shift + 1; 
+
+	graphics.tex_h = 1000;  // Frequency axis
+    int const freq_mul = max_freq / graphics.tex_h;
+	graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
+    for(size_t i = 0; i < graphics.tex_w; ++i)
+    {
+        for(size_t j = 0; j < graphics.tex_h; ++j)
+        {
+            graphics.tex_data[i * graphics.tex_h + j] = STFT(data, window_size, window_size, window_shift*i, (1 + j) * freq_mul);
+        }
+    }
 }
 
 int main ()
@@ -214,13 +249,13 @@ int main ()
 
     graphics.mesh = std::vector<float>
     {
-        -1, 0,  1,  0, 1, 0,  0, 1, 
-        -1, 0, -1,  0, 1, 0,  0, 0,
-         1, 0,  1,  0, 1, 0,  1, 1,
+        -1,  1, 0,  0, 1, 0,  0, 1, 
+        -1, -1, 0,  0, 1, 0,  0, 0,
+         1,  1, 0,  0, 1, 0,  1, 1,
 
-        -1, 0, -1,  0, 1, 0,  0, 0, 
-         1, 0, -1,  0, 1, 0,  1, 0, 
-         1, 0,  1,  0, 1, 0,  1, 1 
+        -1, -1, 0,  0, 1, 0,  0, 0, 
+         1, -1, 0,  0, 1, 0,  1, 0, 
+         1,  1, 0,  0, 1, 0,  1, 1 
     };
     graphics.num_verts = 6;
 
@@ -251,23 +286,8 @@ int main ()
 	glfwSetWindowUserPointer(graphics.window, &graphics);
 
 	//Generate texture
-	double sine_wave[10024];
-	for(int i = 0; i < 10024; i++)
-		sine_wave[i] = sin(2 * M_PI * double(i) / 10024.0);
-
     glGenTextures(1, &graphics.texture);
-	graphics.tex_w = 400;
-	graphics.tex_h = 400; 
-	graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
-    float max_frequency = 2;
-    int window_size = 32;
-    for(size_t i = 0; i < graphics.tex_w; ++i)
-    {
-        for(size_t j = 0; j < graphics.tex_h; ++j)
-        {
-            graphics.tex_data[i * graphics.tex_h + j] = STFT(sine_wave, window_size, window_size, i * window_size / 2, j * max_frequency);
-        }
-    }
+    GenerateTexture(graphics);
 
 	//Set location of uniforms in shader
     graphics.p_mat_loc = glGetUniformLocation(graphics.shader_program, "pMat");
@@ -277,7 +297,7 @@ int main ()
 
     // Init matrix uniforms 
 	glm::mat4x4 pMat = glm::perspective(glm::radians(45.0f),(GLfloat)graphics.width/graphics.height, 0.1f, 100.0f); 
-    glm::mat4x4 vMat = glm::lookAt(glm::vec3(0.0, 3.0, 0.1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); 
+    glm::mat4x4 vMat = glm::lookAt(glm::vec3(0.0, 0.0, 3.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); 
     glUniformMatrix4fv(graphics.p_mat_loc, 1, GL_FALSE, glm::value_ptr(pMat));
     glUniformMatrix4fv(graphics.v_mat_loc, 1, GL_FALSE, glm::value_ptr(vMat));
 
