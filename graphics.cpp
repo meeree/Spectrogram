@@ -15,6 +15,7 @@
 #include <stack>
 #include <random>
 #include <fstream>
+#include <math.h>
 
 struct Graphics 
 {
@@ -93,7 +94,7 @@ struct Graphics
 
     void Startup (GLfloat const& width_, GLfloat const& height_, char const* vert_loc, char const* frag_loc, const char* title="Untitled Window")
     {   
-		done = false;
+	done = false;
         width = width_; 
         height = height_;
 
@@ -186,14 +187,14 @@ bool Render (double const& t, Graphics& graphics)
 	return true;
 }
 
-double STFT (std::vector<double> const& input_signal,
+float STFT (std::vector<float> const& input_signal,
 		int const n_samples,
 		int const chunk_size,
 		int const offset,
-		double const freq)
+		float const freq)
 {
-	double real_prt = 0;
-	double img_prt = 0;
+	float real_prt = 0;
+	float img_prt = 0;
 	for(int m = 0; m < chunk_size; m++)
 	{
 		real_prt += input_signal[offset + m] * cos(2 * M_PI * m * freq / n_samples);
@@ -206,13 +207,80 @@ double STFT (std::vector<double> const& input_signal,
 	std::cout << "Imaginary part: " << img_prt << std::endl;
 	#endif
 
-	return (real_prt * real_prt + img_prt * img_prt);
+	return real_prt * real_prt + img_prt * img_prt;
+}
+
+unsigned int reverse_binary(unsigned int num, int N)
+{
+	float d = static_cast<int>(log2(N) + 0.5);
+	int ret = 0;
+	for(int i=0;i<d;i++)
+	{
+		ret = (num % 2)+2*ret;
+		num = num/2;
+	}
+
+	return ret;
+}
+
+void fft(std::vector<float>& data_real, float freq)
+{
+	using namespace std;
+	int temp_len = data_real.size();
+    	int len = int(pow(2, ceil(log2(data_real.size()))) + 0.5);
+	data_real.resize(len);
+
+	vector<float> data_img(data_real.size());
+	for(unsigned int i = 0; i<data_real.size();i++)
+	{
+		if(reverse_binary(i, data_real.size()) > i)
+		{
+			float temp = data_real.at(i);
+			int rev_i = reverse_binary(i, data_real.size());
+			data_real.at(i) = data_real.at(rev_i);
+			data_real.at(rev_i) = temp;
+		}		
+	}
+
+	float wn_re;
+	float wn_im;
+
+	unsigned int N = data_real.size();
+
+	for(unsigned int bstep=2; bstep <= N; bstep *= 2)
+	{
+		for(unsigned int j = 0; j < bstep / 2; j++)
+		{
+			wn_re = cos(2 * M_PI * freq * j / bstep);
+			wn_im = -sin(2 * M_PI * freq * j / bstep);
+			
+			for(unsigned int hi = j; hi < N; hi += bstep)
+			{
+				float t1 = wn_re * data_real[hi + bstep/2]
+					 - wn_im * data_img[hi + bstep/2];
+
+				float t2 = wn_re * data_img[hi + bstep/2]
+					 + wn_im * data_real[hi + bstep/2];
+
+
+				data_real[hi + bstep / 2] = data_real[hi] - t1;
+				data_img[hi + bstep / 2] = data_img[hi] - t2;
+
+				data_real[hi] = data_real[hi] + t1;
+				data_img[hi] = data_img[hi] + t2;
+			}
+		}
+	}
+
+
+	for(unsigned int i = 0; i < data_real.size(); i++)
+		data_real[i] = (data_real[i]*data_real[i] + data_img[i]*data_img[i]);
 }
 
 void GenerateTexture (Graphics& graphics) 
 {
     // Load in WAV file
-    AudioFile<double> audio_file;
+    AudioFile<float> audio_file;
     audio_file.load("./voice.wav");
     int channel = 0;
     int num_samples = audio_file.getNumSamplesPerChannel();
@@ -220,7 +288,7 @@ void GenerateTexture (Graphics& graphics)
 
     int const sample_rate = audio_file.getSampleRate();
     int const window_size = sample_rate / 10;
-    int const window_shift = window_size / 2;
+    int const window_shift = window_size;
     int const max_freq = 16000;
 
     audio_file.printSummary();
@@ -228,23 +296,25 @@ void GenerateTexture (Graphics& graphics)
     // Time axis:
     // We use the whole file by calculating so that we have the exact amount of texels necessary. 
     // We want (tex_w-1) * window_shift + window_size = N.
-	graphics.tex_w = (data.size() - window_size) / window_shift + 1; 
+    graphics.tex_w = (data.size() - window_size) / window_shift + 1; 
 
-	graphics.tex_h = 1000;  // Frequency axis
+    graphics.tex_h = 1000;  // Frequency axis
     int const freq_mul = max_freq / graphics.tex_h;
-	graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
+    graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
     for(size_t i = 0; i < graphics.tex_w; ++i)
     {
+	auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
+	fft(chunk, freq_mul);
         for(size_t j = 0; j < graphics.tex_h; ++j)
         {
-            graphics.tex_data[i * graphics.tex_h + j] = STFT(data, window_size, window_size, window_shift*i, (1 + j) * freq_mul);
+            graphics.tex_data[i * graphics.tex_h + j] = chunk[j];
         }
     }
 }
 
 int main ()
 {   
-	Graphics graphics;
+    Graphics graphics;
     graphics.Startup(1920, 1080, "./Shaders/vert.glsl", "./Shaders/frag.glsl", "Optimization Stuff"); 
 
     graphics.mesh = std::vector<float>
