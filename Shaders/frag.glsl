@@ -24,5 +24,5 @@ in VS_OUT
 void main(void)
 {
 	float t = texture(sampler, fs_in.uvCoords).r;
-    color = mix(vec4(1, 0, 0, 1), vec4(0, 1, 0, 1), t);
+    color = mix(vec4(1, 0, 0, 1), vec4(1, 1, 0, 1), clamp(t, 0.5, 1.0));
 }

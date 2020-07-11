@@ -227,7 +227,7 @@ void fft(std::vector<float>& data_real)
 {
 	using namespace std;
 	int temp_len = data_real.size();
-    	int len = int(pow(2, ceil(log2(data_real.size()))) + 0.5);
+    int len = int(pow(2, ceil(log2(data_real.size()))) + 0.5);
 	data_real.resize(len);
 
 	vector<float> data_img(data_real.size());
@@ -271,25 +271,21 @@ void fft(std::vector<float>& data_real)
 			}
 		}
 	}
-
-
 	for(unsigned int i = 0; i < data_real.size(); i++)
-		data_real[i] = (data_real[i]*data_real[i] + data_img[i]*data_img[i]);
+		data_real[i] = sqrt(data_real[i]*data_real[i] + data_img[i]*data_img[i]);
 }
 
 void GenerateTexture (Graphics& graphics) 
 {
     // Load in WAV file
     AudioFile<float> audio_file;
-    audio_file.load("./voice.wav");
+    audio_file.load("./voice_single_sound_only.wav");
     int channel = 0;
     int num_samples = audio_file.getNumSamplesPerChannel();
     auto& data = audio_file.samples[channel];
 
-    int const sample_rate = audio_file.getSampleRate();
-    int const window_size = sample_rate / 10;
-    int const window_shift = window_size;
-    int const max_freq = 16000;
+    int const window_size = 256;
+    int const window_shift = window_size / 2;
 
     audio_file.printSummary();
 
@@ -298,17 +294,14 @@ void GenerateTexture (Graphics& graphics)
     // We want (tex_w-1) * window_shift + window_size = N.
     graphics.tex_w = (data.size() - window_size) / window_shift + 1; 
 
-    graphics.tex_h = 1000;  // Frequency axis
-    int const freq_mul = max_freq / graphics.tex_h;
+    graphics.tex_h = window_size;  // Frequency axis
     graphics.tex_data.resize(graphics.tex_h * graphics.tex_w);
     for(size_t i = 0; i < graphics.tex_w; ++i)
     {
-	auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
-	fft(chunk);
+        auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
+        fft(chunk);
         for(size_t j = 0; j < graphics.tex_h; ++j)
-        {
-            graphics.tex_data[i * graphics.tex_h + j] = chunk[j];
-        }
+            graphics.tex_data[j + graphics.tex_w * i] = log(chunk[j]) + 1;
     }
 }
 
@@ -359,7 +352,7 @@ int main ()
     glGenTextures(1, &graphics.texture);
     GenerateTexture(graphics);
 
-	//Set location of uniforms in shader
+	//Set location of uniforms in shade
     graphics.p_mat_loc = glGetUniformLocation(graphics.shader_program, "pMat");
     graphics.v_mat_loc = glGetUniformLocation(graphics.shader_program, "vMat");
     graphics.m_mat_loc = glGetUniformLocation(graphics.shader_program, "mMat");
