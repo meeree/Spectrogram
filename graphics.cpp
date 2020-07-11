@@ -223,7 +223,7 @@ unsigned int reverse_binary(unsigned int num, int N)
 	return ret;
 }
 
-void fft(std::vector<float>& data_real, float freq)
+void fft(std::vector<float>& data_real)
 {
 	using namespace std;
 	int temp_len = data_real.size();
@@ -251,8 +251,8 @@ void fft(std::vector<float>& data_real, float freq)
 	{
 		for(unsigned int j = 0; j < bstep / 2; j++)
 		{
-			wn_re = cos(2 * M_PI * freq * j / bstep);
-			wn_im = -sin(2 * M_PI * freq * j / bstep);
+			wn_re = cos(2 * M_PI * j / bstep);
+			wn_im = -sin(2 * M_PI * j / bstep);
 			
 			for(unsigned int hi = j; hi < N; hi += bstep)
 			{
@@ -304,7 +304,7 @@ void GenerateTexture (Graphics& graphics)
     for(size_t i = 0; i < graphics.tex_w; ++i)
     {
 	auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
-	fft(chunk, freq_mul);
+	fft(chunk);
         for(size_t j = 0; j < graphics.tex_h; ++j)
         {
             graphics.tex_data[i * graphics.tex_h + j] = chunk[j];
