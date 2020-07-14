@@ -94,7 +94,7 @@ struct Graphics
 
     void Startup (GLfloat const& width_, GLfloat const& height_, char const* vert_loc, char const* frag_loc, const char* title="Untitled Window")
     {   
-	done = false;
+        done = false;
         width = width_; 
         height = height_;
 
@@ -177,7 +177,7 @@ bool Render (double const& t, Graphics& graphics)
 
     glGenerateMipmap(GL_TEXTURE_2D); 
 
-    glm::mat4x4 m_mat(1.0f);
+    glm::mat4x4 m_mat = glm::rotate(glm::mat4x4(1.0f), (float)-M_PI_2, glm::vec3(0.0f, 0.0f, 1.0f));
     glUniformMatrix4fv(graphics.m_mat_loc, 1, GL_FALSE, glm::value_ptr(m_mat));
     glDrawArrays(GL_TRIANGLES, 0, graphics.num_verts);
 
@@ -279,12 +279,12 @@ void GenerateTexture (Graphics& graphics)
 {
     // Load in WAV file
     AudioFile<float> audio_file;
-    audio_file.load("./voice_single_sound_only.wav");
+    audio_file.load("./voice.wav");
     int channel = 0;
     int num_samples = audio_file.getNumSamplesPerChannel();
     auto& data = audio_file.samples[channel];
 
-    int const window_size = 256;
+    int const window_size = 2048;
     int const window_shift = window_size / 2;
 
     audio_file.printSummary();
@@ -301,7 +301,7 @@ void GenerateTexture (Graphics& graphics)
         auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
         fft(chunk);
         for(size_t j = 0; j < graphics.tex_h; ++j)
-            graphics.tex_data[j + graphics.tex_w * i] = log(chunk[j]) + 1;
+            graphics.tex_data[j * graphics.tex_w + i] = log(chunk[j]) + 1;
     }
 }
 
