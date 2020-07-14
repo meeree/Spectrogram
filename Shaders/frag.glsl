@@ -14,6 +14,8 @@ layout (location=5) uniform mat4 mMat;
 
 layout (location=6) uniform vec3 camPos;
 
+layout (location=10) uniform int colorscheme; 
+
 in VS_OUT
 {   
     vec3 position;
@@ -24,5 +26,21 @@ in VS_OUT
 void main(void)
 {
 	float t = texture(sampler, fs_in.uvCoords).r;
-    color = mix(vec4(1, 0, 0, 1), vec4(1, 1, 0, 1), clamp(t, 0.5, 1.0));
+
+    if(colorscheme == 0)
+    {
+        float brk = 0.98;
+        if(t > brk)
+            color = vec4(1, 0, 0, 1);
+        else 
+            color = mix(vec4(1, 1, 1, 1), vec4(0.4, 0, 1, 1), t / brk);
+    }
+    else 
+    {
+        float brk = 0.98;
+        if(t > brk)
+            color = vec4(0, 0, 1, 1);
+        else 
+            color = mix(vec4(0, 0, 0, 1), vec4(0, 0.4, 1, 1), t / brk);
+    }
 }

@@ -33,6 +33,8 @@ struct Graphics
     GLuint sampler_loc;
 	std::vector<float> tex_data; 
 
+    GLuint colorscheme = 0, num_colorschemes = 2; 
+
     Graphics () = default;
 
     GLuint LoadInShader(GLenum const &shaderType, char const *fname) 
@@ -153,6 +155,11 @@ void KeyCallback(GLFWwindow* window, int key, int, int action, int)
 		glm::mat4x4 vMat = glm::lookAt(glm::vec3(3.0, 3.0, -5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); 
 		glUniformMatrix4fv(graphics->v_mat_loc, 1, GL_FALSE, glm::value_ptr(vMat));
 	}
+    if (key == GLFW_KEY_K && action == GLFW_PRESS)
+    {
+        graphics->colorscheme = (graphics->colorscheme + 1) % graphics->num_colorschemes;
+        glUniform1i(glGetUniformLocation(graphics->shader_program, "colorscheme"), graphics->colorscheme);
+    }
 }
 
 bool Render (double const& t, Graphics& graphics)
@@ -285,7 +292,7 @@ void GenerateTexture (Graphics& graphics)
     auto& data = audio_file.samples[channel];
 
     int const window_size = 2048;
-    int const window_shift = window_size / 2;
+    int const window_shift = window_size / 6;
 
     audio_file.printSummary();
 
@@ -301,7 +308,7 @@ void GenerateTexture (Graphics& graphics)
         auto chunk = std::vector<float>(data.begin() + window_shift*i, data.begin() + window_shift*i + window_size);
         fft(chunk);
         for(size_t j = 0; j < graphics.tex_h; ++j)
-            graphics.tex_data[j * graphics.tex_w + i] = log(chunk[j]) + 1;
+            graphics.tex_data[j * graphics.tex_w + i] = 10 * log(chunk[j]) / log(10);
     }
 }
 
